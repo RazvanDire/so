@@ -1,0 +1,16 @@
+{
+	"files.associations": {
+		"syscall_arch.h": "c",
+		"string.h": "c",
+		"unistd.h": "c",
+		"types.h": "c",
+		"errno.h": "c",
+		"syscall.h": "c",
+		"io.h": "c",
+		"stdarg.h": "c",
+		"fcntl.h": "c",
+		"essentials.h": "c",
+		"mman.h": "c",
+		"mem_list.h": "c"
+	}
+}
