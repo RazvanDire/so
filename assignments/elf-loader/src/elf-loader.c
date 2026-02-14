@@ -45,6 +45,21 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp)
 	 * Validate ELF class is 64-bit (ELFCLASS64) - "Not a 64-bit ELF" + exit code 4 if invalid.
 	 */
 
+	const char elf_magic[16] = {0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00,
+								0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+	for (int i = 0; i < 16; i++) {
+		if (((char *)elf_contents)[i] != elf_magic[i]) {
+			if (i == 4) {
+				perror("Not a 64-bit ELF");
+				exit(4);
+			} else {
+				perror("Not a valid ELF file");
+				exit(3);
+			}
+		}
+	}
+
 	/**
 	 * TODO: Load PT_LOAD segments
 	 * For minimal syscall-only binaries.
