@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 #include <elf.h>
 #include <sys/auxv.h>
+#include <time.h>
 
 #define PT_LOAD 1
 
@@ -40,7 +41,8 @@ void *map_elf(const char *filename)
 	return file;
 }
 
-void load_and_run(const char *filename, int argc, char **argv, char **envp) {
+void load_and_run(const char *filename, int argc, char **argv, char **envp)
+{
 	// Contents of the ELF file are in the buffer: elf_contents[x] is the x-th byte of the ELF file.
 	void *elf_contents = map_elf(filename);
 
@@ -73,7 +75,7 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 
 	Elf64_Ehdr elf_hdr;
 	memcpy(&elf_hdr, elf_contents, sizeof(elf_hdr));
-	
+
 	size_t page = 4096;
 
 	/**
@@ -83,6 +85,14 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 	 *	- Use mprotect() or map with the correct permissions directly using mmap().
 	 */
 
+	u_int64_t load_base = 0;
+
+	// For PIE executables, we need to load them at a random base address.
+	if (elf_hdr.e_type == ET_DYN) {
+		srand(time(NULL));
+		load_base = (0x4000000 + (rand() % 0x10000000)) & ~(page-1);
+	}
+
 	for (unsigned int i = 0; i < elf_hdr.e_phnum; i++) {
 		Elf64_Phdr ph;
 		memcpy(&ph, elf_contents + elf_hdr.e_phoff + i * elf_hdr.e_phentsize, sizeof(ph));
@@ -91,29 +101,33 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 			continue;
 		}
 
-		u_int64_t aligned_vaddr = ph.p_vaddr & ~(page - 1);
-		u_int64_t delta = ph.p_vaddr - aligned_vaddr;
-		
+		// Align the mapping to page boundaries
+		u_int64_t aligned_vaddr = (ph.p_vaddr + load_base) & ~(page - 1);
+		u_int64_t delta = ph.p_vaddr + load_base - aligned_vaddr;
+
 		void *addr = mmap((void *)aligned_vaddr, ph.p_memsz + delta,
 							PROT_READ | PROT_WRITE | PROT_EXEC,
 							MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-		
+
 		if (addr == MAP_FAILED) {
 			perror("mmap");
 			exit(1);
 		}
-		
+
+		// Copy the segment contents from the ELF file to the mapped memory
 		memcpy(addr + delta, elf_contents + ph.p_offset, ph.p_filesz);
-		
+
+		// If p_memsz is larger than p_filesz, zero out the remaining memory (BSS section)
 		if (ph.p_memsz > ph.p_filesz) {
 			memset(addr + delta + ph.p_filesz, 0, ph.p_memsz - ph.p_filesz);
 		}
-			
+
 		unsigned int prot = 0;
 		prot = ph.p_flags & PF_R ? prot | PROT_READ : prot;
 		prot = ph.p_flags & PF_W ? prot | PROT_WRITE : prot;
 		prot = ph.p_flags & PF_X ? prot | PROT_EXEC : prot;
 
+		// Set the correct permissions for the mapped segment
 		if (mprotect(addr, ph.p_memsz + delta, prot) < 0) {
 			perror("mprotect");
 			exit(1);
@@ -138,23 +152,19 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 		exit(1);
 	}
 
-	printf("stack_base: %p\n", stack_base);
-
 	u_int64_t *stack = (u_int64_t *)(stack_base + rl.rlim_cur);  // top
 	stack = (u_int64_t *)((u_int64_t)stack & ~0xF);        // align 16 bytes
 
-	printf("stack: %p\n", stack);
-
-	unsigned long auvx[38] = { AT_SYSINFO_EHDR, getauxval(AT_SYSINFO_EHDR),
+	unsigned long auxv[38] = { AT_SYSINFO_EHDR, getauxval(AT_SYSINFO_EHDR),
 								AT_HWCAP, getauxval(AT_HWCAP),
 								AT_PAGESZ, 4096,
 								AT_CLKTCK, getauxval(AT_CLKTCK),
 								AT_PHDR, (u_int64_t)elf_contents + elf_hdr.e_phoff,
 								AT_PHENT, elf_hdr.e_phentsize,
 								AT_PHNUM, elf_hdr.e_phnum,
-								AT_BASE, 0,
+								AT_BASE, load_base,
 								AT_FLAGS, 0,
-								AT_ENTRY, elf_hdr.e_entry,
+								AT_ENTRY, elf_hdr.e_entry + load_base,
 								AT_UID, getuid(),
 								AT_EUID, geteuid(),
 								AT_GID, getgid(),
@@ -163,12 +173,13 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 								AT_RANDOM, (u_int64_t)stack - 16,
 								AT_EXECFN, (u_int64_t)argv[0],
 								AT_PLATFORM, 0,
-								AT_NULL, 0 
+								AT_NULL, 0
 							};
 
+	// Push auxv
 	for (int i = 37; i >= 0; i--) {
 		stack--;
-		*stack = auvx[i];
+		*stack = auxv[i];
 	}
 
 	int envc = 0;
@@ -180,7 +191,7 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 	stack--;
 	*stack = 0;  // envp null terminator
 
-	for (int i = envc-1; i >=0; i--) {	
+	for (int i = envc - 1; i >= 0; i--) {
 		stack--;
 		*stack = (u_int64_t)envp[i];
 	}
@@ -206,7 +217,7 @@ void load_and_run(const char *filename, int argc, char **argv, char **envp) {
 	 */
 
 	// TODO: Set the entry point and the stack pointer
-	void (*entry)() = (void (*)())elf_hdr.e_entry;
+	void (*entry)() = (void (*)())(elf_hdr.e_entry + load_base);
 
 	// Transfer control
 	__asm__ __volatile__(
