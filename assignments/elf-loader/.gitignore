@@ -40,7 +40,6 @@ replay_pid*
 
 # Libraries
 *.lib
-*.a
 *.la
 *.lo
 
