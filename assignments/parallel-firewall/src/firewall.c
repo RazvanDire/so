@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
 
 #include "ring_buffer.h"
 #include "consumer.h"
@@ -59,20 +62,29 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	so_consumer_ctx_t ctx;
+	ctx.producer_rb = &ring_buffer;
+	pthread_mutex_init(&ctx.file_mutex, NULL);
+	ctx.out_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
 	thread_ids = calloc(num_consumers, sizeof(pthread_t));
 	DIE(thread_ids == NULL, "calloc pthread_t");
 
 	/* create consumer threads */
-	threads = create_consumers(thread_ids, num_consumers, &ring_buffer, argv[2]);
+	threads = create_consumers(thread_ids, num_consumers, &ctx);
 
 	/* start publishing data */
 	publish_data(&ring_buffer, argv[1]);
 
 	/* TODO: wait for child threads to finish execution*/
-	(void) threads;
+	for (int i = 0; i < threads; i++) {
+		pthread_join(thread_ids[i], NULL);
+	}
 
+	ring_buffer_destroy(&ring_buffer);
+	pthread_mutex_destroy(&ctx.file_mutex);
+	close(ctx.out_fd);
 	free(thread_ids);
 
 	return 0;
 }
-
