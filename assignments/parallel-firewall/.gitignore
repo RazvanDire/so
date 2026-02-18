@@ -1,3 +1,9 @@
+*/__pycache__/*
+
+tests/in/*.in
+tests/out/*.out
+tests/ref/*.ref
+
 # Compiled class file
 *.class
 
@@ -131,6 +137,8 @@ bower_components
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+
 
 # misc
 .sass-cache
