@@ -66,6 +66,7 @@ int main(int argc, char **argv)
 	ctx.producer_rb = &ring_buffer;
 	pthread_mutex_init(&ctx.file_mutex, NULL);
 	ctx.out_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	ctx.offset = 0;
 
 	thread_ids = calloc(num_consumers, sizeof(pthread_t));
 	DIE(thread_ids == NULL, "calloc pthread_t");

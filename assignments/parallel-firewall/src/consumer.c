@@ -30,10 +30,17 @@ void *consumer_thread(void *args)
 		int len = snprintf(buf, 256, "%s %016lx %lu\n",
 			RES_TO_STR(action), hash, timestamp);
 
+		off_t offset;
+
 		pthread_mutex_lock(&ctx->file_mutex);
-		write(ctx->out_fd, buf, len);
+		offset = ctx->offset;
+		(ctx->offset) += len;
 		pthread_mutex_unlock(&ctx->file_mutex);
+
+		pwrite(ctx->out_fd, buf, len, offset);
 	}
+
+	return NULL;
 }
 
 int create_consumers(pthread_t *tids,
