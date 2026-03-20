@@ -61,8 +61,12 @@ ssize_t ring_buffer_dequeue(so_ring_buffer_t *ring, void *data, size_t size)
 		return 0;
 	}
 
-	*((so_packet_t *) data) = ((so_packet_t *) ring->data)[ring->read_pos % ring->len];
+	dequeue_arg *arg = (dequeue_arg *)data;
+
+	size_t read_pos = ring->read_pos;
 	(ring->read_pos)++;
+	arg->pkt = ((so_packet_t *) ring->data)[read_pos % ring->len];
+	arg->read_pos = read_pos;
 
 	pthread_mutex_unlock(&ring->empty_mutex);
 
@@ -95,4 +99,5 @@ void ring_buffer_stop(so_ring_buffer_t *ring)
 {
 	/* TODO: Implement ring_buffer_stop */
 	ring->producer_stopped = 1;
+	//pthread_cond_broadcast(&ring->empty_cond);
 }

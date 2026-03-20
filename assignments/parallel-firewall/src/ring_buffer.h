@@ -10,6 +10,11 @@
 
 #include "packet.h"
 
+typedef struct dequeue_arg {
+	so_packet_t pkt;
+	size_t read_pos;
+} dequeue_arg;
+
 typedef struct so_ring_buffer_t {
 	char *data;
 

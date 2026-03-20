@@ -67,6 +67,9 @@ int main(int argc, char **argv)
 	pthread_mutex_init(&ctx.file_mutex, NULL);
 	ctx.out_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
 	ctx.offset = 0;
+	ctx.packet_index = 0;
+	pthread_mutex_init(&ctx.sort_mutex, NULL);
+	pthread_cond_init(&ctx.sort_cond, NULL);
 
 	thread_ids = calloc(num_consumers, sizeof(pthread_t));
 	DIE(thread_ids == NULL, "calloc pthread_t");
@@ -84,6 +87,8 @@ int main(int argc, char **argv)
 
 	ring_buffer_destroy(&ring_buffer);
 	pthread_mutex_destroy(&ctx.file_mutex);
+	pthread_mutex_destroy(&ctx.sort_mutex);
+	pthread_cond_destroy(&ctx.sort_cond);
 	close(ctx.out_fd);
 	free(thread_ids);
 

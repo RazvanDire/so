@@ -9,6 +9,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "cmd.h"
 #include "utils.h"
@@ -97,8 +98,14 @@ void redirect(simple_command_t *s)
 static bool shell_cd(simple_command_t *s, word_t *dir)
 {
 	/* TODO: Execute cd. */
-	if (!dir || !dir->string || dir->next_part || dir->next_word)
-		return true;
+	int rc = 1, do_chdir = 1;
+	char err_msg[1024];
+
+	// case when there is more than one argument
+	if (dir && dir->next_word) {
+		do_chdir = 0;
+		strcpy(err_msg, "cd: too many arguments\n");
+	}
 
 	int flags, fd_out, fd_err = ERR;
 	char *out, *err;
@@ -126,13 +133,77 @@ static bool shell_cd(simple_command_t *s, word_t *dir)
 		free(err);
 	}
 
-	char *path = get_word(dir);
-	int rc = chdir(path);
+	char *path;
 
-	free(path);
+	if (!dir || !dir->string) {
+		char *home = getenv("HOME");
+		int home_len = strlen(home);
 
-	if (rc)
-		write(fd_err, "no such file or directory\n", 27);
+		path = malloc(home_len + 1);
+		memcpy(path, home, home_len + 1);
+	} else if (do_chdir) {
+		path = get_word(dir);
+
+		if (!strcmp(path, "~")) {
+			free(path);
+
+			char *home = getenv("HOME");
+			int home_len = strlen(home);
+
+			path = malloc(home_len + 1);
+			memcpy(path, home, home_len + 1);
+		} else if (!strcmp(path, "-")) {
+			free(path);
+
+			char *old_pwd = getenv("OLDPWD");
+
+			if (!old_pwd) {
+				do_chdir = 0;
+				strcpy(err_msg, "cd: OLDPWD not set\n");
+			} else {
+				int old_pwd_len = strlen(old_pwd);
+
+				path = malloc(old_pwd_len + 1);
+				memcpy(path, old_pwd, old_pwd_len + 1);
+			}
+		}
+	}
+
+	if (do_chdir) {
+		rc = chdir(path);
+
+		if (rc) {
+			switch (errno) {
+				case EACCES:
+					sprintf(err_msg, "cd: %s: Permission denied\n", path);
+					break;
+
+				case ENOENT:
+					strcpy(err_msg, "cd: no such file or directory\n");
+					break;
+
+				case ENOTDIR:
+					sprintf(err_msg, "cd: %s: Not a directory\n", path);
+					break;
+
+				default:
+					strcpy(err_msg, "cd: unknown error\n");
+			}
+		}
+
+		free(path);
+	}
+
+	if (!do_chdir || rc)
+		write(fd_err, err_msg, strlen(err_msg));
+	else {
+		char *cwd = getcwd(NULL, 0);
+
+		setenv("OLDPWD", getenv("PWD"), 1);
+		setenv("PWD", cwd, 1);
+
+		free(cwd);
+	}
 
 	if (s->err)
 		close(fd_err);

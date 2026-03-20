@@ -12,30 +12,45 @@
 void *consumer_thread(void *args)
 {
 	/* TODO: implement consumer thread */
-	so_packet_t pkt;
+	dequeue_arg arg;
 	char buf[PKT_SZ];
 	so_consumer_ctx_t *ctx = (so_consumer_ctx_t *)args;
 
 	while (true) {
-		int rc = ring_buffer_dequeue(ctx->producer_rb, &pkt, 0);
+		int rc = ring_buffer_dequeue(ctx->producer_rb, &arg, 0);
 
 		if (!rc) {
 			break;
 		}
 
-		int action = process_packet(&pkt);
-		unsigned long hash = packet_hash(&pkt);
-		unsigned long timestamp = pkt.hdr.timestamp;
+		int action = process_packet(&arg.pkt);
+		unsigned long hash = packet_hash(&arg.pkt);
+		unsigned long timestamp = arg.pkt.hdr.timestamp;
 
 		int len = snprintf(buf, 256, "%s %016lx %lu\n",
 			RES_TO_STR(action), hash, timestamp);
 
 		off_t offset;
 
-		pthread_mutex_lock(&ctx->file_mutex);
+		// pthread_mutex_lock(&ctx->file_mutex);
+		// offset = ctx->offset;
+		// (ctx->offset) += len;
+		// pthread_mutex_unlock(&ctx->file_mutex);
+
+		pthread_mutex_lock(&ctx->sort_mutex);
+
+		while (arg.read_pos != ctx->packet_index) {
+			pthread_cond_wait(&ctx->sort_cond, &ctx->sort_mutex);
+		}
+
+		(ctx->packet_index)++; 
+
 		offset = ctx->offset;
 		(ctx->offset) += len;
-		pthread_mutex_unlock(&ctx->file_mutex);
+
+		pthread_cond_broadcast(&ctx->sort_cond);
+
+		pthread_mutex_unlock(&ctx->sort_mutex);
 
 		pwrite(ctx->out_fd, buf, len, offset);
 	}
