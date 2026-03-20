@@ -144,14 +144,18 @@ static bool shell_cd(simple_command_t *s, word_t *dir)
 	} else if (do_chdir) {
 		path = get_word(dir);
 
-		if (!strcmp(path, "~")) {
-			free(path);
-
+		if (!strncmp(path, "~", 1)) {
 			char *home = getenv("HOME");
 			int home_len = strlen(home);
+			int init_len = strlen(path); 
 
-			path = malloc(home_len + 1);
-			memcpy(path, home, home_len + 1);
+			// replace '~' in the directory path with the actual path of home
+			char *tmp_path = malloc(home_len + init_len);
+			memcpy(tmp_path, home, home_len);
+			memcpy(tmp_path + home_len, path + 1, init_len);
+
+			free(path);
+			path = tmp_path;
 		} else if (!strcmp(path, "-")) {
 			free(path);
 
