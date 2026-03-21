@@ -344,14 +344,14 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 		rc = WEXITSTATUS(ret_status);
 	}
 
-	free(cmd);
-	free_argv(argc, argv);
-
 	if (!pid) {
 		printf("Execution failed for '%s'\n", cmd);
 
 		exit(-1);
 	}
+
+	free(cmd);
+	free_argv(argc, argv);
 
 	return rc; /* TODO: Replace with actual exit status. */
 }
