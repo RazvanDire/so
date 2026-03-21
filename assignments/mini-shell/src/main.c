@@ -78,9 +78,9 @@ static void start_shell(void)
 		if (!user || !hostname || !pwd)
 			printf("$ ");
 		else if (strstr(pwd, home) == pwd)
-			printf("%s@%s:~%s$ ", getenv("USER"), getenv("NAME"), pwd + strlen(home));
+			printf("\033[1;32m%s@%s\033[0m:\033[36m~%s\033[0m$ ", getenv("USER"), getenv("NAME"), pwd + strlen(home));
 		else
-			printf("%s@%s:%s$ ", getenv("USER"), getenv("NAME"), pwd);
+			printf("\033[1;32m%s@%s\033[0m:\033[36m%s\033[0m$ ", getenv("USER"), getenv("NAME"), pwd);
 
 		fflush(stdout);
 		ret = 0;
