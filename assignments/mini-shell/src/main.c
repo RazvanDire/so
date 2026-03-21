@@ -69,11 +69,15 @@ static void start_shell(void)
 	for (;;) {
 		// uncomment printf(PROMPT) and comment the ones with getenv for full points
 		//printf(PROMPT);
+		char *user = getenv("USER");
+		char *hostname = getenv("NAME");
 		char *pwd = getenv("PWD");
 		char *home = getenv("HOME");
 
 		// if the CWD starts with the home directory, replace it with '~'
-		if (strstr(pwd, home) == pwd)
+		if (!user || !hostname || !pwd)
+			printf("$ ");
+		else if (strstr(pwd, home) == pwd)
 			printf("%s@%s:~%s$ ", getenv("USER"), getenv("NAME"), pwd + strlen(home));
 		else
 			printf("%s@%s:%s$ ", getenv("USER"), getenv("NAME"), pwd);

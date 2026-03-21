@@ -137,26 +137,21 @@ static bool shell_cd(simple_command_t *s, word_t *dir)
 
 	if (!dir || !dir->string) {
 		char *home = getenv("HOME");
-		int home_len = strlen(home);
 
-		path = malloc(home_len + 1);
-		memcpy(path, home, home_len + 1);
+		// treat case when HOME is not set
+		if (home) {
+			int home_len = strlen(home);
+	
+			path = malloc(home_len + 1);
+			memcpy(path, home, home_len + 1);
+		} else {
+			do_chdir = 0;
+			strcpy(err_msg, "cd: HOME not set\n");
+		}
 	} else if (do_chdir) {
 		path = get_word(dir);
 
-		if (!strncmp(path, "~", 1)) {
-			char *home = getenv("HOME");
-			int home_len = strlen(home);
-			int init_len = strlen(path); 
-
-			// replace '~' in the directory path with the actual path of home
-			char *tmp_path = malloc(home_len + init_len);
-			memcpy(tmp_path, home, home_len);
-			memcpy(tmp_path + home_len, path + 1, init_len);
-
-			free(path);
-			path = tmp_path;
-		} else if (!strcmp(path, "-")) {
+		if (!strcmp(path, "-")) {
 			free(path);
 
 			char *old_pwd = getenv("OLDPWD");

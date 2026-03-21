@@ -7,6 +7,36 @@
 #include "utils.h"
 
 /**
+ * Expand tilde (~) at the beginning of a path string to the home directory.
+ * If the word starts with "~/" or is just the character '~',
+ * it is replaced with the HOME environment variable.
+ * Caller is responsible for freeing the returned string.
+ */
+static char *expand_tilde(char *word)
+{
+	if (word == NULL || word[0] != '~' || (strlen(word) > 1 && word[1] != '/'))
+		return word;
+
+	char *home = getenv("HOME");
+	if (home == NULL)
+		return word;
+
+	int home_len = strlen(home);
+	int word_len = strlen(word);
+
+	/* Allocate memory: home + rest of word (excluding ~) + null terminator */
+	char *expanded = malloc(home_len + word_len);
+	if (expanded == NULL)
+		return word;
+
+	memcpy(expanded, home, home_len);
+	memcpy(expanded + home_len, word + 1, word_len);
+
+	free(word);
+	return expanded;
+}
+
+/**
  * Concatenate parts of the word to obtain the command.
  */
 char *get_word(word_t *s)
@@ -40,6 +70,9 @@ char *get_word(word_t *s)
 
 		s = s->next_part;
 	}
+
+	/* Expand tilde (~) if it appears at the beginning of the word */
+	string = expand_tilde(string);
 
 	return string;
 }
