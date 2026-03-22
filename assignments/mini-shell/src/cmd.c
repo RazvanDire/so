@@ -141,7 +141,7 @@ static bool shell_cd(simple_command_t *s, word_t *dir)
 		// treat case when HOME is not set
 		if (home) {
 			int home_len = strlen(home);
-	
+
 			path = malloc(home_len + 1);
 			memcpy(path, home, home_len + 1);
 		} else {
@@ -193,9 +193,9 @@ static bool shell_cd(simple_command_t *s, word_t *dir)
 		free(path);
 	}
 
-	if (!do_chdir || rc)
+	if (!do_chdir || rc) {
 		write(fd_err, err_msg, strlen(err_msg));
-	else {
+	} else {
 		char *cwd = getcwd(NULL, 0);
 
 		setenv("OLDPWD", getenv("PWD"), 1);
